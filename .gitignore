@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+config.json
+credentials.json
+*.token
+*.secret
+
+# Canvas data
+cache/
+canvas-cache/
+downloads/
+canvas-downloads/
+submissions/
+*.ics
+
+# Reports and logs
+*.log
+canvas_api_report.json
+
+# Editors and operating systems
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

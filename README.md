@@ -18,12 +18,18 @@
 
 ## 目录结构
 
+GitHub 仓库名是 `canvas-study-assistant-skill`。安装到 Codex 时，建议将目标目录命名为 `canvas-study-assistant`，与 Skill 的内部名称和调用名称保持一致。
+
 ```text
-canvas-study-assistant/
+canvas-study-assistant/    # 安装到 Codex 后的目录名
 ├── README.md
 ├── SECURITY.md
+├── LICENSE
 ├── SKILL.md
 ├── .gitignore
+├── .github/
+│   └── workflows/
+│       └── test.yml
 ├── requirements-optional.txt
 ├── agents/
 │   └── openai.yaml
@@ -275,7 +281,6 @@ python3 -m py_compile scripts/canvas_cli.py
 
 测试不得访问真实 Canvas、真实 Keychain 或 Credential Manager。
 
-## 发布前建议
+## 许可证
 
-本项目暂未附带开源许可证。公开发布前，请选择并添加合适的许可证，例如 MIT、Apache-2.0 或其他符合你需求的许可证。
-
+本项目采用 [MIT License](LICENSE)。
