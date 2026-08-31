@@ -59,14 +59,14 @@ python3 -m pip install -r requirements-optional.txt
 ### macOS / Linux
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/canvas-study-assistant.git \
+git clone https://github.com/hairoom/canvas-study-assistant-skill.git \
   ~/.codex/skills/canvas-study-assistant
 ```
 
 ### Windows PowerShell
 
 ```powershell
-git clone https://github.com/YOUR_USERNAME/canvas-study-assistant.git `
+git clone https://github.com/hairoom/canvas-study-assistant-skill.git `
   "$env:USERPROFILE\.codex\skills\canvas-study-assistant"
 ```
 
