@@ -18,10 +18,10 @@
 
 ## 目录结构
 
-GitHub 仓库名是 `canvas-study-assistant-skill`。安装到 Codex 时，建议将目标目录命名为 `canvas-study-assistant`，与 Skill 的内部名称和调用名称保持一致。
+
 
 ```text
-canvas-study-assistant/    # 安装到 Codex 后的目录名
+canvas-study-assistant-skill/   
 ├── README.md
 ├── SECURITY.md
 ├── LICENSE
@@ -75,12 +75,14 @@ git clone https://github.com/hairoom/canvas-study-assistant-skill.git \
 git clone https://github.com/hairoom/canvas-study-assistant-skill.git `
   "$env:USERPROFILE\.codex\skills\canvas-study-assistant"
 ```
+### Prompt安装
+、、、text
 
-安装后重新打开 Codex，或开始一个新任务，然后输入：
+帮我安装一下https://github.com/hairoom/canvas-study-assistant-skill
+、、、
 
-```text
-使用 $canvas-study-assistant 连接我的 Canvas
-```
+
+
 
 ## 首次初始化
 
@@ -107,6 +109,10 @@ Canvas 地址是平时登录 Canvas 使用的域名，不包含课程路径或 `
 ```
 
 ### 3. 在对话中初始化
+
+```text
+使用 $canvas-study-assistant 连接我的 Canvas
+```
 
 Skill 会显示简短提示，并要求：
 
