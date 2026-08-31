@@ -1,0 +1,3 @@
+# Linux only: enables persistent storage through Secret Service/KWallet when available.
+keyring>=25; platform_system == "Linux"
+

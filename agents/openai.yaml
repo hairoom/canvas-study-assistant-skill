@@ -1,0 +1,7 @@
+interface:
+  display_name: "Canvas 学习助手"
+  short_description: "面向学生的 Canvas 课程、作业、排期、资料下载与安全提交助手"
+  default_prompt: "使用 $canvas-study-assistant 查看我最近的作业和截止日期。"
+
+policy:
+  allow_implicit_invocation: true
