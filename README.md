@@ -42,7 +42,9 @@ canvas-study-assistant-skill/
 ├── scripts/
 │   └── canvas_cli.py
 └── tests/
+    ├── test_rescource_discovery.py
     └── test_cli.py
+
 ```
 
 `SKILL.md` 是 Skill 的入口；详细流程按需从 `references/` 加载。`scripts/canvas_cli.py` 负责确定性的 Canvas API 请求、凭证、缓存、文件匹配、下载和提交操作。
@@ -51,7 +53,7 @@ canvas-study-assistant-skill/
 
 - Python 3.10 或更高版本。
 - 一个允许生成个人 Access Token 的 Canvas 学生账户。
-- macOS 和 Windows 的长期凭证功能不需要安装额外 Python 包。
+- macOS 和 Windows 的长期凭证功能。
 - Linux 长期凭证依赖可用的系统 Secret Service/KWallet 和 Python `keyring`；无法使用时可切换为仅当前会话模式。
 
 Linux 可选安装：
