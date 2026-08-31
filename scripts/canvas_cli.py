@@ -15,10 +15,18 @@ from urllib.request import Request, build_opener, HTTPRedirectHandler
 APP = "canvas-study-assistant"
 SERVICE = APP
 TTLS = {
-    "standard": {"courses": 1800, "assignments": 300, "files": 900},
-    "realtime": {"courses": 0, "assignments": 0, "files": 0},
-    "low-request": {"courses": 14400, "assignments": 1800, "files": 7200},
+    "standard": {"courses": 1800, "assignments": 300, "files": 900, "modules": 900},
+    "realtime": {"courses": 0, "assignments": 0, "files": 0, "modules": 0},
+    "low-request": {"courses": 14400, "assignments": 1800, "files": 7200, "modules": 7200},
 }
+
+
+class CanvasAPIError(RuntimeError):
+    """Canvas failure with a stable category suitable for capability reports."""
+
+    def __init__(self, status: int, category: str, detail: str):
+        self.status, self.category, self.detail = status, category, detail
+        super().__init__(f"Canvas HTTP {status} ({category}): {detail}")
 
 
 class SafeRedirectHandler(HTTPRedirectHandler):
@@ -204,8 +212,10 @@ class Canvas:
                 return payload, dict(res.headers), res.geturl()
         except HTTPError as exc:
             body = exc.read().decode("utf-8", "replace")[:800]
-            if exc.code == 401: raise RuntimeError("Canvas token is invalid, expired, or revoked; run update-token") from exc
-            raise RuntimeError(f"Canvas HTTP {exc.code}: {body}") from exc
+            categories = {401: "unauthorized", 403: "permission_denied", 404: "hidden_or_missing", 429: "rate_limited"}
+            category = categories.get(exc.code, "http_error")
+            detail = "Canvas token is invalid, expired, or revoked; run update-token" if exc.code == 401 else body
+            raise CanvasAPIError(exc.code, category, detail) from exc
         except URLError as exc: raise RuntimeError(f"Canvas connection failed: {exc.reason}") from exc
 
     def get(self, path: str, fields=None): return self.request("GET", path, fields)[:2]
@@ -229,6 +239,16 @@ def cached(cfg, category: str, key: str, producer, refresh=False):
     old, ttl = read_json(path, {}), TTLS[cfg.get("cache_mode", "standard")][category]
     if not refresh and ttl and old.get("stored_at", 0) + ttl > time.time(): return old["data"]
     data = producer(); secure_write(path, {"stored_at": time.time(), "data": data}); return data
+
+
+def capability(producer):
+    """Run an optional student-readable endpoint without hiding why it failed."""
+    try:
+        return {"status": "available", "data": producer()}
+    except CanvasAPIError as exc:
+        return {"status": exc.category, "http_status": exc.status, "detail": exc.detail}
+    except RuntimeError as exc:
+        return {"status": "unsupported_or_unavailable", "detail": str(exc)}
 
 
 def validate(base: str, token: str):
@@ -259,6 +279,78 @@ def assignments(api, cfg, cid, refresh=False):
     return cached(cfg, "assignments", str(cid), lambda: api.pages(f"/api/v1/courses/{cid}/assignments", [("include[]", "submission"), ("include[]", "overrides"), ("all_dates", "true"), ("per_page", "100")]), refresh)
 def assignment(api, cfg, cid, query, refresh=False): return resolve(assignments(api, cfg, cid, refresh), query, "assignment")
 def clean_html(value): return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html.unescape(value or ""))).strip()
+
+
+MODULE_KIND = {
+    "File": "file", "Page": "page", "Assignment": "assignment", "Quiz": "quiz",
+    "Discussion": "discussion", "ExternalUrl": "external_url", "ExternalTool": "external_tool",
+    "SubHeader": "subheader",
+}
+
+
+def normalize_module_item(item, module):
+    raw_type = item.get("type") or "Unknown"
+    details = item.get("content_details") or {}
+    return {
+        "kind": MODULE_KIND.get(raw_type, "unknown"), "raw_type": raw_type,
+        "id": item.get("id"), "content_id": item.get("content_id"),
+        "module_id": module.get("id"), "module_name": module.get("name"),
+        "position": item.get("position"), "title": item.get("title"),
+        "html_url": item.get("html_url"), "external_url": item.get("external_url"),
+        "new_tab": item.get("new_tab"), "completion_requirement": item.get("completion_requirement"),
+        "locked": bool(details.get("locked_for_user")), "lock_explanation": details.get("lock_explanation"),
+        "supported": raw_type in MODULE_KIND,
+    }
+
+
+def course_modules(api, cfg, cid, refresh=False):
+    def load():
+        modules = api.pages(f"/api/v1/courses/{cid}/modules", [
+            ("include[]", "items"), ("include[]", "content_details"), ("per_page", "100")])
+        for module in modules:
+            if not isinstance(module.get("items"), list):
+                module["items"] = api.pages(
+                    f"/api/v1/courses/{cid}/modules/{module['id']}/items",
+                    [("include[]", "content_details"), ("per_page", "100")])
+        return modules
+    return cached(cfg, "modules", str(cid), load, refresh)
+
+
+def normalized_modules(api, cfg, cid, refresh=False):
+    result = []
+    for module in course_modules(api, cfg, cid, refresh):
+        result.append({
+            "id": module.get("id"), "name": module.get("name"), "position": module.get("position"),
+            "state": module.get("state"), "unlock_at": module.get("unlock_at"),
+            "prerequisite_module_ids": module.get("prerequisite_module_ids") or [],
+            "require_sequential_progress": module.get("require_sequential_progress"),
+            "items": [normalize_module_item(item, module) for item in module.get("items", [])],
+        })
+    return result
+
+
+def discover_course(api, cfg, c, refresh=False):
+    cid = c["id"]
+    detail = capability(lambda: api.get(f"/api/v1/courses/{cid}", [("include[]", "syllabus_body")])[0])
+    specs = {
+        "tabs": lambda: api.pages(f"/api/v1/courses/{cid}/tabs", [("per_page", "100")]),
+        "modules": lambda: normalized_modules(api, cfg, cid, refresh),
+        "files": lambda: course_files(api, cfg, cid, refresh),
+        "pages": lambda: api.pages(f"/api/v1/courses/{cid}/pages", [("per_page", "100")]),
+        "assignments": lambda: assignments(api, cfg, cid, refresh),
+        "discussions": lambda: api.pages(f"/api/v1/courses/{cid}/discussion_topics", [("per_page", "100")]),
+        "announcements": lambda: api.pages("/api/v1/announcements", [("context_codes[]", f"course_{cid}"), ("per_page", "100")]),
+        "classic_quizzes": lambda: api.pages(f"/api/v1/courses/{cid}/quizzes", [("per_page", "100")]),
+        "new_quizzes": lambda: api.pages(f"/api/quiz/v1/courses/{cid}/quizzes", [("per_page", "100")]),
+        "external_tools": lambda: api.pages(f"/api/v1/courses/{cid}/external_tools/visible_course_nav_tools", [("per_page", "100")]),
+    }
+    found = {name: capability(loader) for name, loader in specs.items()}
+    course_data = detail.get("data") if detail.get("status") == "available" else c
+    return {
+        "course": {"id": cid, "name": c.get("name"), "course_code": c.get("course_code")},
+        "syllabus": {"status": detail.get("status"), "text": clean_html((course_data or {}).get("syllabus_body"))},
+        "capabilities": found,
+    }
 
 
 def words(value):
@@ -338,12 +430,80 @@ def cmd_schedule(args):
     output({"timezone": cfg.get("timezone"), "days": args.days, "pending": sorted(result, key=lambda x: x["due_at"])})
 
 
-def course_files(api, cfg, cid, refresh=False): return cached(cfg, "files", str(cid), lambda: api.pages(f"/api/v1/courses/{cid}/files", [("per_page", "100")]), refresh)
+def course_files(api, cfg, cid, refresh=False):
+    def load():
+        files = api.pages(f"/api/v1/courses/{cid}/files", [("per_page", "100")])
+        by_id = {str(f.get("id")): f for f in files}
+        try: modules = normalized_modules(api, cfg, cid, refresh)
+        except CanvasAPIError: modules = []
+        for module in modules:
+            for item in module["items"]:
+                if item["kind"] != "file" or item.get("content_id") is None: continue
+                fid = str(item["content_id"])
+                if fid not in by_id:
+                    try: by_id[fid] = api.get(f"/api/v1/files/{fid}")[0]
+                    except CanvasAPIError: continue
+                by_id[fid].setdefault("module_contexts", []).append({
+                    "module_id": module["id"], "module_name": module["name"], "module_item_id": item["id"]})
+        return list(by_id.values())
+    return cached(cfg, "files", str(cid), load, refresh)
 
 
 def cmd_files(args):
     api, cfg = client(); c = course(api, cfg, args.course, args.refresh); files = course_files(api, cfg, c["id"], args.refresh)
-    output({"course": {"id": c["id"], "name": c.get("name")}, "files": [{"id": f.get("id"), "name": f.get("display_name") or f.get("filename"), "content_type": f.get("content-type"), "size": f.get("size"), "updated_at": f.get("updated_at")} for f in files]})
+    output({"course": {"id": c["id"], "name": c.get("name")}, "files": [{"id": f.get("id"), "name": f.get("display_name") or f.get("filename"), "content_type": f.get("content-type"), "size": f.get("size"), "updated_at": f.get("updated_at"), "module_contexts": f.get("module_contexts", [])} for f in files]})
+
+
+def cmd_modules(args):
+    api, cfg = client(); c = course(api, cfg, args.course, args.refresh)
+    output({"course": {"id": c["id"], "name": c.get("name")}, "modules": normalized_modules(api, cfg, c["id"], args.refresh)})
+
+
+def cmd_inspect(args):
+    api, cfg = client(); c = course(api, cfg, args.course, args.refresh); report = discover_course(api, cfg, c, args.refresh)
+    for name, cap in report["capabilities"].items():
+        if cap.get("status") != "available": continue
+        data = cap.get("data") or []
+        if name == "modules":
+            cap["count"] = len(data); cap["item_count"] = sum(len(m["items"]) for m in data)
+        else: cap["count"] = len(data) if isinstance(data, list) else 1
+        if not args.full: cap.pop("data", None)
+    output(report)
+
+
+def cmd_doctor(args):
+    api, cfg = client(); c = course(api, cfg, args.course, True); report = discover_course(api, cfg, c, True)
+    checks = {"syllabus": {"status": report["syllabus"]["status"], "present": bool(report["syllabus"].get("text"))}}
+    for name, cap in report["capabilities"].items():
+        check = {k: cap.get(k) for k in ("status", "http_status", "detail") if cap.get(k) is not None}
+        if cap.get("status") == "available":
+            data = cap.get("data") or []; check["count"] = len(data) if isinstance(data, list) else 1
+            if name == "modules": check["item_count"] = sum(len(m["items"]) for m in data)
+        checks[name] = check
+    output({"course": report["course"], "checks": checks})
+
+
+def scrub_api_output(value):
+    if isinstance(value, list): return [scrub_api_output(v) for v in value]
+    if not isinstance(value, dict): return value
+    blocked = {"access_token", "authorization", "token"}
+    return {k: scrub_api_output(v) for k, v in value.items() if k.casefold() not in blocked}
+
+
+def cmd_api_get(args):
+    api, _ = client(); path = args.path.strip()
+    if not path.startswith("/api/") or path.startswith("//") or urlparse(path).netloc:
+        raise RuntimeError("api-get only accepts same-origin paths beginning with /api/")
+    if re.search(r"(?:access_token|authorization|token)=", path, re.I):
+        raise RuntimeError("Credentials are not allowed in api-get paths")
+    fields = []
+    for pair in args.param:
+        if "=" not in pair: raise RuntimeError("--param must use KEY=VALUE")
+        key, value = pair.split("=", 1)
+        if key.casefold() in {"access_token", "authorization", "token"}: raise RuntimeError("Credential parameters are forbidden")
+        fields.append((key, value))
+    data = api.pages(path, fields, limit=args.limit) if args.paginate else api.get(path, fields)[0]
+    output(scrub_api_output(data))
 
 
 def cmd_match(args):
@@ -420,6 +580,10 @@ def make_parser():
     p=sub.add_parser("assignments"); p.add_argument("--course", required=True); p.add_argument("--pending", action="store_true"); p.add_argument("--refresh", action="store_true"); p.set_defaults(fn=cmd_assignments)
     p=sub.add_parser("schedule"); p.add_argument("--days", type=int, default=7); p.set_defaults(fn=cmd_schedule)
     p=sub.add_parser("files"); p.add_argument("--course", required=True); p.add_argument("--refresh", action="store_true"); p.set_defaults(fn=cmd_files)
+    p=sub.add_parser("modules"); p.add_argument("--course", required=True); p.add_argument("--refresh", action="store_true"); p.set_defaults(fn=cmd_modules)
+    p=sub.add_parser("inspect-course"); p.add_argument("--course", required=True); p.add_argument("--refresh", action="store_true"); p.add_argument("--full", action="store_true"); p.set_defaults(fn=cmd_inspect)
+    p=sub.add_parser("doctor"); p.add_argument("--course", required=True); p.set_defaults(fn=cmd_doctor)
+    p=sub.add_parser("api-get"); p.add_argument("--path", required=True); p.add_argument("--param", action="append", default=[]); p.add_argument("--paginate", action="store_true"); p.add_argument("--limit", type=int, default=500); p.set_defaults(fn=cmd_api_get)
     p=sub.add_parser("match-files"); p.add_argument("--course", required=True); p.add_argument("--assignment", required=True); p.set_defaults(fn=cmd_match)
     p=sub.add_parser("download"); p.add_argument("--file-id", required=True); p.add_argument("--output", required=True); p.set_defaults(fn=cmd_download)
     p=sub.add_parser("upload-draft"); p.add_argument("--course", required=True); p.add_argument("--assignment", required=True); p.add_argument("--file", required=True); p.add_argument("--confirm"); p.set_defaults(fn=cmd_upload)
