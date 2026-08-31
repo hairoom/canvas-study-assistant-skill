@@ -76,10 +76,10 @@ git clone https://github.com/hairoom/canvas-study-assistant-skill.git `
   "$env:USERPROFILE\.codex\skills\canvas-study-assistant"
 ```
 ### Prompt安装
-、、、text
+```text
 
 帮我安装一下https://github.com/hairoom/canvas-study-assistant-skill
-、、、
+```
 
 
 
