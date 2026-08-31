@@ -1,6 +1,6 @@
 ---
 name: canvas-study-assistant
-description: Use Canvas LMS as a student to find courses, assignments and deadlines; plan study work; match and download course files; summarize assignment requirements; discuss ideas and create local demos; and submit only after explicit confirmation. Do not use for teacher, grading, or course-administration workflows.
+description: Use Canvas LMS as a student to discover course content, modules, syllabus, pages, quizzes, discussions, assignments and deadlines; plan study work; download materials; collaborate on drafts; and submit only after explicit confirmation. Do not use for teacher, grading, or course-administration workflows.
 ---
 
 # Canvas Study Assistant
@@ -23,6 +23,7 @@ Apart from the user's deliberate first-round plaintext message, never write or r
 
 - First-time setup: read [references/initialization-prompts.md](references/initialization-prompts.md).
 - Connection, token replacement, caching, CLI commands, or API errors: read [references/api-workflows.md](references/api-workflows.md).
+- Course discovery, Modules, syllabus, quizzes, discussions, unknown content types, or external tools: read [references/resource-discovery.md](references/resource-discovery.md).
 - Matching an assignment to files or downloading materials: read [references/file-matching.md](references/file-matching.md).
 - Summarizing requirements, discussing topics, or producing a local draft/demo: read [references/assignment-collaboration.md](references/assignment-collaboration.md).
 - Uploading or submitting: always read [references/submission-safety.md](references/submission-safety.md) immediately before acting.
@@ -30,6 +31,8 @@ Apart from the user's deliberate first-round plaintext message, never write or r
 ## Core behavior
 
 - Resolve courses by exact ID first, then course name/code. Ask the user when multiple plausible matches remain.
+- Inspect the course before claiming content is absent. Distinguish empty, hidden, locked, permission-denied, unsupported, and external-tool content.
+- Treat Modules as an ordered relationship graph, not a file list. Preserve module context and report unknown item types instead of silently dropping them.
 - Convert all dates to the timezone returned by the Canvas profile. Use the effective per-student due date when available. Keep assignments without a deadline in a separate group.
 - Refresh assignment data before producing a study plan. Ask for missing availability and effort estimates only when they materially change the plan; clearly label estimates.
 - Display schedules in chat. Mention that Markdown, CSV, Excel, calendar-event lists, or checklists can be generated on request.

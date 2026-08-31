@@ -14,6 +14,10 @@ python scripts/canvas_cli.py courses
 python scripts/canvas_cli.py assignments --course COURSE --pending --refresh
 python scripts/canvas_cli.py schedule --days 7
 python scripts/canvas_cli.py files --course COURSE
+python scripts/canvas_cli.py modules --course COURSE --refresh
+python scripts/canvas_cli.py inspect-course --course COURSE [--full] [--refresh]
+python scripts/canvas_cli.py doctor --course COURSE
+python scripts/canvas_cli.py api-get --path /api/v1/... [--param KEY=VALUE] [--paginate]
 python scripts/canvas_cli.py match-files --course COURSE --assignment ASSIGNMENT
 python scripts/canvas_cli.py download --file-id FILE_ID --output DIRECTORY
 python scripts/canvas_cli.py cache standard|realtime|low-request|clear
@@ -51,3 +55,6 @@ Regardless of mode, force refresh before planning, downloads, uploads, and submi
 - Prefer assignment data returned for the current user and date overrides.
 - Convert ISO timestamps to the profile timezone.
 - A `403` is permission denial. A `404` may mean absent or hidden content. Do not claim a new token will fix either.
+- Use `inspect-course` before saying a course has no syllabus, modules, pages, discussions, announcements, quizzes, files, or external tools.
+- Use `doctor` for a compact, refresh-forced capability report suitable for bug reports. Remove course names and identifiers before sharing it publicly.
+- `api-get` is a read-only same-origin escape hatch for student-readable Canvas endpoints that do not yet have a dedicated command. Never use it to simulate writes or bypass a dedicated safety workflow.

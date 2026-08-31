@@ -9,6 +9,8 @@ Check in order:
 3. Files adjacent to the assignment in the same module.
 4. Course files matched by normalized title, assignment number, folder/week/topic, and metadata.
 
+The Files endpoint is not authoritative by itself. Enumerate Modules and resolve every `File` item through its `content_id`; merge those results with course Files while retaining module name, module item ID, and adjacency.
+
 The CLI performs inexpensive lexical scoring first. Use model judgment only to break close ties from a small candidate list; do not send full course contents unnecessarily.
 
 ## Confidence
