@@ -20,7 +20,7 @@ The SQLite index may store resource IDs, titles, types, timestamps, lock states,
 
 ## MCP
 
-The MCP server is optional and requires the official Python `mcp` package listed in `requirements-mcp.txt`. It does not replace Canvas API access. It keeps search and sync tools structured and compact while reusing the same Python core as the CLI.
+The MCP server is optional and uses the official Python MCP SDK v2 listed in `requirements-mcp.txt`. It does not replace Canvas API access. It keeps search and sync tools structured and compact while reusing the same Python core as the CLI.
 
 Available tools:
 
