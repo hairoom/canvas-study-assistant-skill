@@ -6,11 +6,15 @@ from __future__ import annotations
 import argparse, getpass, hashlib, html, json, mimetypes, os, re, shutil, subprocess, sys, tempfile, time, uuid
 from datetime import datetime, timedelta, timezone
 from difflib import SequenceMatcher
+from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urljoin, urlparse
 from urllib.request import Request, build_opener, HTTPRedirectHandler
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path: sys.path.insert(0, str(PROJECT_ROOT))
 
 APP = "canvas-study-assistant"
 SERVICE = APP
@@ -281,6 +285,31 @@ def assignment(api, cfg, cid, query, refresh=False): return resolve(assignments(
 def clean_html(value): return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html.unescape(value or ""))).strip()
 
 
+class CanvasLinkParser(HTMLParser):
+    def __init__(self, course_id): super().__init__(); self.course_id, self.links = str(course_id), []
+    def handle_starttag(self, tag, attrs):
+        if tag not in {"a", "img", "source"}: return
+        values = dict(attrs); href = values.get("href") or values.get("src")
+        if not href: return
+        path = urlparse(href).path
+        patterns = [
+            ("file", rf"/courses/{re.escape(self.course_id)}/files/(\d+)"),
+            ("page", rf"/courses/{re.escape(self.course_id)}/pages/([^/?#]+)"),
+            ("assignment", rf"/courses/{re.escape(self.course_id)}/assignments/(\d+)"),
+            ("quiz", rf"/courses/{re.escape(self.course_id)}/quizzes/(\d+)"),
+            ("discussion", rf"/courses/{re.escape(self.course_id)}/discussion_topics/(\d+)"),
+        ]
+        for kind, pattern in patterns:
+            match = re.search(pattern, path)
+            if match: self.links.append({"kind": kind, "id": match.group(1), "path": path}); return
+
+
+def canvas_internal_links(value, course_id):
+    parser = CanvasLinkParser(course_id); parser.feed(value or "")
+    unique = {(item["kind"], item["id"]): item for item in parser.links}
+    return list(unique.values())
+
+
 MODULE_KIND = {
     "File": "file", "Page": "page", "Assignment": "assignment", "Quiz": "quiz",
     "Discussion": "discussion", "ExternalUrl": "external_url", "ExternalTool": "external_tool",
@@ -346,9 +375,11 @@ def discover_course(api, cfg, c, refresh=False):
     }
     found = {name: capability(loader) for name, loader in specs.items()}
     course_data = detail.get("data") if detail.get("status") == "available" else c
+    syllabus_body = (course_data or {}).get("syllabus_body")
     return {
         "course": {"id": cid, "name": c.get("name"), "course_code": c.get("course_code")},
-        "syllabus": {"status": detail.get("status"), "text": clean_html((course_data or {}).get("syllabus_body"))},
+        "syllabus": {"status": detail.get("status"), "text": clean_html(syllabus_body),
+                     "links": canvas_internal_links(syllabus_body, cid)},
         "capabilities": found,
     }
 
@@ -371,7 +402,12 @@ def cmd_init(args):
     base, tok = normalize_url(args.base_url), getpass.getpass("Canvas Access Token (hidden): ").strip()
     profile, student_courses = validate(base, tok); save_token(tok, args.storage, base, str(profile["id"]))
     cfg = {"canvas_url": base, "canvas_user_id": str(profile["id"]), "canvas_user_name": profile.get("name"), "timezone": profile.get("time_zone") or "UTC", "credential_mode": args.storage, "token_expires_at": args.expires, "cache_mode": "standard"}
-    secure_write(config_path(), cfg); output({"connected": True, "user": cfg["canvas_user_name"], "user_id": cfg["canvas_user_id"], "timezone": cfg["timezone"], "student_courses": len(student_courses), "credential_mode": args.storage, "cache_mode": "standard"})
+    secure_write(config_path(), cfg); indexed = None
+    if not args.skip_index:
+        from canvas_study.sync import sync_all
+        indexed = sync_all(Canvas(base, tok), cfg, student_courses, discover_course, app_dir() / "resource-index.sqlite3")
+    output({"connected": True, "user": cfg["canvas_user_name"], "user_id": cfg["canvas_user_id"], "timezone": cfg["timezone"],
+            "student_courses": len(student_courses), "credential_mode": args.storage, "cache_mode": "standard", "structure_index": indexed})
 
 
 def cmd_update(args):
@@ -405,6 +441,29 @@ def cmd_status(args):
     except RuntimeError: available = False
     public = {k: cfg.get(k) for k in ("canvas_url", "canvas_user_id", "canvas_user_name", "timezone", "credential_mode", "token_expires_at", "cache_mode")}
     output({"configured": True, "credential_available": available, **public})
+
+
+def cmd_index_sync(args):
+    from canvas_study.sync import sync_all
+    api, cfg = client(); student_courses = [c for c in courses(api, cfg, True) if any(
+        e.get("type") == "student" or e.get("role") == "StudentEnrollment" for e in c.get("enrollments", []))]
+    output(sync_all(api, cfg, student_courses, discover_course, app_dir() / "resource-index.sqlite3"))
+
+
+def cmd_index_status(args):
+    from canvas_study.service import CanvasStudyService
+    output(CanvasStudyService(app_dir() / "resource-index.sqlite3").sync_status())
+
+
+def cmd_find_resource(args):
+    from canvas_study.service import CanvasStudyService
+    output(CanvasStudyService(app_dir() / "resource-index.sqlite3").find_resource(
+        args.course, args.query, args.kind or None, args.limit))
+
+
+def cmd_course_tree(args):
+    from canvas_study.service import CanvasStudyService
+    output(CanvasStudyService(app_dir() / "resource-index.sqlite3").course_tree(args.course))
 
 
 def cmd_courses(args):
@@ -572,10 +631,14 @@ def cmd_disconnect(args):
 
 def make_parser():
     root = argparse.ArgumentParser(description="Canvas student assistant"); sub = root.add_subparsers(dest="command", required=True)
-    p=sub.add_parser("init"); p.add_argument("--base-url", required=True); p.add_argument("--expires"); p.add_argument("--storage", choices=["session","system"], default="system"); p.set_defaults(fn=cmd_init)
+    p=sub.add_parser("init"); p.add_argument("--base-url", required=True); p.add_argument("--expires"); p.add_argument("--storage", choices=["session","system"], default="system"); p.add_argument("--skip-index", action="store_true"); p.set_defaults(fn=cmd_init)
     p=sub.add_parser("update-token"); p.add_argument("--expires"); p.add_argument("--confirm-account-switch", action="store_true"); p.set_defaults(fn=cmd_update)
     p=sub.add_parser("storage"); p.add_argument("mode", choices=["session","system"]); p.set_defaults(fn=cmd_storage)
     p=sub.add_parser("status"); p.set_defaults(fn=cmd_status); p=sub.add_parser("disconnect"); p.set_defaults(fn=cmd_disconnect)
+    p=sub.add_parser("index-sync"); p.set_defaults(fn=cmd_index_sync)
+    p=sub.add_parser("index-status"); p.set_defaults(fn=cmd_index_status)
+    p=sub.add_parser("find-resource"); p.add_argument("--course", required=True); p.add_argument("--query", required=True); p.add_argument("--kind", action="append", default=[]); p.add_argument("--limit", type=int, default=10); p.set_defaults(fn=cmd_find_resource)
+    p=sub.add_parser("course-tree"); p.add_argument("--course", required=True); p.set_defaults(fn=cmd_course_tree)
     p=sub.add_parser("courses"); p.add_argument("--refresh", action="store_true"); p.set_defaults(fn=cmd_courses)
     p=sub.add_parser("assignments"); p.add_argument("--course", required=True); p.add_argument("--pending", action="store_true"); p.add_argument("--refresh", action="store_true"); p.set_defaults(fn=cmd_assignments)
     p=sub.add_parser("schedule"); p.add_argument("--days", type=int, default=7); p.set_defaults(fn=cmd_schedule)
