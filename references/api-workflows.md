@@ -5,7 +5,7 @@
 Run from the skill directory:
 
 ```text
-python scripts/canvas_cli.py init --base-url https://canvas.example.edu --expires YYYY-MM-DD
+python scripts/canvas_cli.py init --base-url https://canvas.example.edu --expires YYYY-MM-DD [--skip-index]
 python scripts/canvas_cli.py status
 python scripts/canvas_cli.py update-token [--expires YYYY-MM-DD]
 python scripts/canvas_cli.py storage session|system
@@ -17,6 +17,10 @@ python scripts/canvas_cli.py files --course COURSE
 python scripts/canvas_cli.py modules --course COURSE --refresh
 python scripts/canvas_cli.py inspect-course --course COURSE [--full] [--refresh]
 python scripts/canvas_cli.py doctor --course COURSE
+python scripts/canvas_cli.py index-sync
+python scripts/canvas_cli.py index-status
+python scripts/canvas_cli.py course-tree --course COURSE
+python scripts/canvas_cli.py find-resource --course COURSE --query QUERY [--kind KIND]
 python scripts/canvas_cli.py api-get --path /api/v1/... [--param KEY=VALUE] [--paginate]
 python scripts/canvas_cli.py match-files --course COURSE --assignment ASSIGNMENT
 python scripts/canvas_cli.py download --file-id FILE_ID --output DIRECTORY
@@ -24,6 +28,8 @@ python scripts/canvas_cli.py cache standard|realtime|low-request|clear
 ```
 
 Commands emit JSON. Summarize useful fields; do not paste large raw payloads unless requested.
+
+Normal initialization builds a metadata-only SQLite index for every active student course. Use `--skip-index` only for recovery from rate limits or instance-specific errors, then run `index-sync` later. Search with `find-resource` before issuing broad live queries.
 
 The CLI normally uses the platform's application-data directory for non-secret configuration and cache. If the Codex filesystem sandbox does not allow that directory, request access to that single app directory or set `CANVAS_ASSISTANT_HOME` to a user-approved writable directory. Tokens are never stored there.
 
