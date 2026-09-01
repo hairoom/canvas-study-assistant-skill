@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 
 try:
-    from mcp.server.fastmcp import FastMCP
+    from mcp.server import MCPServer
 except ImportError as exc:
     raise SystemExit("The optional MCP server requires the official 'mcp' Python package") from exc
 
@@ -24,7 +24,7 @@ from canvas_study.service import CanvasStudyService
 from canvas_study.sync import sync_all
 
 
-mcp = FastMCP("Canvas Study Assistant")
+mcp = MCPServer("Canvas Study Assistant")
 
 
 def service(): return CanvasStudyService(canvas_cli.app_dir() / "resource-index.sqlite3")
