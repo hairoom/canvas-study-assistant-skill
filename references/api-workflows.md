@@ -1,5 +1,11 @@
 # API and credential workflows
 
+## MCP bootstrap
+
+When the structured Canvas tools are not registered, run `python scripts/setup_mcp.py` from the Skill root. The installer owns four deterministic steps: create or reuse an isolated environment under the app data directory, install `requirements-mcp.txt`, import-check the server, and register its absolute command and path through `codex mcp add`. A matching registration is left unchanged; a stale registration with the same name is replaced. Restart Codex after a created or updated registration.
+
+This bootstrap does not initialize Canvas and must never ask for, read, or store the Canvas token. Account initialization begins only after the MCP Server is available in a new conversation. For installation failures, return the installer's concrete error and use the CLI as a temporary recovery path.
+
 ## MCP and CLI
 
 Use MCP tools for normal Agent workflows. They call `canvas_study.application.CanvasApplication` directly and return structured results. Use the CLI for first-time hidden Token input, recovery, local diagnosis, or environments without MCP. MCP must never shell out to a CLI command.
