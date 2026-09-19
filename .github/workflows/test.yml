@@ -20,7 +20,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Install MCP dependency
+        run: python -m pip install -r requirements-mcp.txt
       - name: Compile
-        run: python -m py_compile scripts/canvas_cli.py
+        run: python -m compileall -q scripts canvas_study mcp_server
+      - name: Import MCP server
+        run: python -c "from mcp_server.server import mcp; assert mcp"
       - name: Test
         run: python -m unittest discover -s tests -v

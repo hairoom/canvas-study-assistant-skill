@@ -1,6 +1,10 @@
 # API and credential workflows
 
-## CLI
+## MCP and CLI
+
+Use MCP tools for normal Agent workflows. They call `canvas_study.application.CanvasApplication` directly and return structured results. Use the CLI for first-time hidden Token input, recovery, local diagnosis, or environments without MCP. MCP must never shell out to a CLI command.
+
+CLI fallback commands, run from the skill directory:
 
 Run from the skill directory:
 

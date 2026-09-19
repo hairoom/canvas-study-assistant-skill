@@ -1,6 +1,6 @@
 # Canvas Study Assistant
 
-一个面向学生的 Codex Skill，通过 Canvas LMS REST API 在对话中查询课程、整理作业与截止日期、安排学习计划、下载课程资料，并在用户明确确认后辅助上传和提交作业。
+一个面向学生的 Codex Skill。MCP 是 AI 的主要结构化工具入口；本地 CLI 用于首次连接、故障恢复和开发调试。两者共享同一套 Canvas 应用服务，在对话中查询课程、整理作业与截止日期、安排学习计划、下载课程资料，并在用户明确确认后辅助上传和提交作业。
 
 本项目只支持学生工作流，不提供教师、批改、课程管理或查看其他学生数据的能力。
 
@@ -29,23 +29,47 @@ canvas-study-assistant-skill/
 │   └── workflows/
 │       └── test.yml
 ├── requirements-optional.txt
+├── requirements-mcp.txt
 ├── agents/
 │   └── openai.yaml
+├── canvas_study/
+│   ├── application.py
+│   ├── runtime.py
+│   ├── service.py
+│   ├── registry.py
+│   ├── sync.py
+│   └── index.py
+├── mcp_server/
+│   └── server.py
 ├── references/
 │   ├── api-workflows.md
 │   ├── assignment-collaboration.md
 │   ├── file-matching.md
+│   ├── index-and-mcp.md
 │   ├── initialization-prompts.md
+│   ├── resource-discovery.md
 │   └── submission-safety.md
 ├── scripts/
 │   └── canvas_cli.py
 └── tests/
-    ├── test_rescource_discovery.py
+    ├── test_application.py
+    ├── test_resource_discovery.py
+    ├── test_index_and_registry.py
     └── test_cli.py
 
 ```
 
-`SKILL.md` 是 Skill 的入口；详细流程按需从 `references/` 加载。`scripts/canvas_cli.py` 负责确定性的 Canvas API 请求、凭证、缓存、文件匹配、下载和提交操作。
+`SKILL.md` 是 Skill 的入口，详细流程按需从 `references/` 加载。`mcp_server/server.py` 向 AI 提供结构化工具；`canvas_study/application.py` 组织查询、发现、下载、上传和提交工作流；`canvas_study/runtime.py` 负责 Canvas HTTP、凭证、缓存和底层操作。`scripts/canvas_cli.py` 只是同一套能力的本地入口，不是 MCP 的下游命令执行器。
+
+正常调用关系是：
+
+```text
+AI → MCP → Application → Canvas Runtime / Index → Canvas API
+                         ↑
+CLI ─────────────────────┘
+```
+
+MCP 与 CLI 都直接调用共享代码，MCP 不拼接或执行 CLI 命令。
 
 ## 环境要求
 
@@ -59,6 +83,14 @@ Linux 可选安装：
 ```bash
 python3 -m pip install -r requirements-optional.txt
 ```
+
+MCP Server 依赖官方 Python MCP SDK：
+
+```bash
+python3 -m pip install -r requirements-mcp.txt
+```
+
+在支持本地 MCP 的 Agent 客户端中，将 `python3 mcp_server/server.py` 配置为 stdio server。Skill 本身不能替客户端修改 MCP 注册配置；未配置 MCP 时仍可使用 CLI fallback。
 
 ## 安装到 Codex
 
@@ -239,7 +271,11 @@ Demo 默认仅保存在本地，并与上传、提交操作分开。
 
 只有用户在看到最终摘要后明确确认，才能正式提交。网络结果不确定时，Skill 会先查询提交状态，不会盲目重试。
 
-## CLI 调试
+## MCP 与 CLI
+
+支持 MCP 的 Agent 应优先使用 MCP 工具完成课程、作业、索引、下载、上传和提交工作流。上传与提交分别提供“预览”和“执行”工具；执行工具只能在用户看过对应预览并明确确认后调用。
+
+CLI 用于首次 Token 初始化、没有 MCP 的环境、开发调试和故障恢复：
 
 也可以在 Skill 目录中直接调试 CLI：
 
@@ -253,7 +289,7 @@ python3 scripts/canvas_cli.py files --course COURSE_ID
 python3 scripts/canvas_cli.py match-files --course COURSE_ID --assignment ASSIGNMENT_ID
 ```
 
-`init` 和 `update-token` 使用隐藏输入读取 Token。不要把 Token 写进命令参数、环境变量或测试文件。
+`init` 和 `update-token` 使用隐藏输入读取 Token。不要把 Token 写进命令参数、环境变量或测试文件。除这些本地场景外，普通用户不需要手动运行 CLI 命令。
 
 ## 数据与隐私
 
@@ -277,7 +313,7 @@ python3 scripts/canvas_cli.py match-files --course COURSE_ID --assignment ASSIGN
 
 ```bash
 python3 -m unittest discover -s tests -v
-python3 -m py_compile scripts/canvas_cli.py
+python3 -m compileall -q scripts canvas_study mcp_server
 ```
 
 测试不得访问真实 Canvas、真实 Keychain 或 Credential Manager。
