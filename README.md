@@ -50,7 +50,8 @@ canvas-study-assistant-skill/
 │   ├── resource-discovery.md
 │   └── submission-safety.md
 ├── scripts/
-│   └── canvas_cli.py
+│   ├── canvas_cli.py
+│   └── setup_mcp.py
 └── tests/
     ├── test_application.py
     ├── test_resource_discovery.py
@@ -84,13 +85,15 @@ Linux 可选安装：
 python3 -m pip install -r requirements-optional.txt
 ```
 
-MCP Server 依赖官方 Python MCP SDK：
+安装 Skill 后运行一次：
 
 ```bash
-python3 -m pip install -r requirements-mcp.txt
+python3 scripts/setup_mcp.py
 ```
 
-在支持本地 MCP 的 Agent 客户端中，将 `python3 mcp_server/server.py` 配置为 stdio server。Skill 本身不能替客户端修改 MCP 注册配置；未配置 MCP 时仍可使用 CLI fallback。
+该命令会在用户应用数据目录中创建隔离的 Python 环境、安装官方 MCP SDK、验证 Server，并通过 `codex mcp add` 自动注册 `canvas-study-assistant`。它可以重复运行：注册信息未变化时不会重复添加，Skill 路径变化时会更新旧注册。完成后重启 Codex，使新 MCP Server 生效。
+
+安装过程不会读取 Canvas Token，也不会连接 Canvas。Canvas 账号仍在首次使用 Skill 时单独连接。若 Codex CLI 不在 PATH，可传入 `--codex-bin PATH`。
 
 ## 安装到 Codex
 
@@ -99,6 +102,8 @@ python3 -m pip install -r requirements-mcp.txt
 ```bash
 git clone https://github.com/hairoom/canvas-study-assistant-skill.git \
   ~/.codex/skills/canvas-study-assistant
+cd ~/.codex/skills/canvas-study-assistant
+python3 scripts/setup_mcp.py
 ```
 
 ### Windows PowerShell
@@ -106,11 +111,14 @@ git clone https://github.com/hairoom/canvas-study-assistant-skill.git \
 ```powershell
 git clone https://github.com/hairoom/canvas-study-assistant-skill.git `
   "$env:USERPROFILE\.codex\skills\canvas-study-assistant"
+Set-Location "$env:USERPROFILE\.codex\skills\canvas-study-assistant"
+python scripts/setup_mcp.py
 ```
 ### Prompt安装
 ```text
 
-帮我安装一下https://github.com/hairoom/canvas-study-assistant-skill
+帮我安装 https://github.com/hairoom/canvas-study-assistant-skill，
+并运行 Skill 内的 scripts/setup_mcp.py，自动安装 MCP 依赖和注册 Server。
 ```
 
 
