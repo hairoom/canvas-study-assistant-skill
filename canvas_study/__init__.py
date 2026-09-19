@@ -1,6 +1,7 @@
-"""Shared indexing and search core for the Canvas study assistant."""
+"""Shared application, discovery, indexing, and search core."""
 
+from .application import CanvasApplication
 from .index import ResourceIndex
 from .registry import REGISTRY, ResourceRegistry
 
-__all__ = ["REGISTRY", "ResourceIndex", "ResourceRegistry"]
+__all__ = ["CanvasApplication", "REGISTRY", "ResourceIndex", "ResourceRegistry"]
