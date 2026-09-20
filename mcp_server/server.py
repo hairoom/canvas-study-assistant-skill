@@ -55,8 +55,32 @@ def canvas_get_schedule(days: int = 7) -> dict:
 
 @mcp.tool()
 def canvas_find_resource(course_id: str, query: str, kinds: list[str] | None = None, limit: int = 10) -> dict:
-    """Find course resources using exact title, fuzzy terms, and module context."""
+    """Find resources; automatically refresh and enter safe discovery when no reliable result exists."""
     return application().find_resource(course_id, query, kinds, limit)
+
+
+@mcp.tool()
+def canvas_read_api(
+    path: str, params: dict[str, str] | None = None,
+    paginate: bool = False, limit: int = 100,
+) -> dict:
+    """Probe one bounded same-origin Canvas GET endpoint; never sends credentials cross-origin."""
+    return application().read_api(path, params, paginate, limit)
+
+
+@mcp.tool()
+def canvas_discover_api_resources(
+    course: str, query: str, kind: str, path: str,
+    id_field: str = "id", title_field: str = "title",
+    items_field: str | None = None, params: dict[str, str] | None = None,
+    paginate: bool = True,
+    evidence: str = "https://developerdocs.instructure.com/services/canvas",
+) -> dict:
+    """Verify a course-scoped read endpoint, index matching resources, and save its local rule."""
+    return application().discover_api_resources(
+        course, query, kind, path, id_field, title_field,
+        items_field, params, paginate, evidence,
+    )
 
 
 @mcp.tool()

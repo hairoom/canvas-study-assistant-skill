@@ -32,6 +32,7 @@ python scripts/canvas_cli.py index-status
 python scripts/canvas_cli.py course-tree --course COURSE
 python scripts/canvas_cli.py find-resource --course COURSE --query QUERY [--kind KIND]
 python scripts/canvas_cli.py api-get --path /api/v1/... [--param KEY=VALUE] [--paginate]
+python scripts/canvas_cli.py discover-api-resources --course COURSE --query QUERY --kind KIND --path /api/v1/... [--paginate]
 python scripts/canvas_cli.py match-files --course COURSE --assignment ASSIGNMENT
 python scripts/canvas_cli.py download --file-id FILE_ID --output DIRECTORY
 python scripts/canvas_cli.py cache standard|realtime|low-request|clear
