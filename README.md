@@ -62,15 +62,6 @@ canvas-study-assistant-skill/
 
 `SKILL.md` 是 Skill 的入口，详细流程按需从 `references/` 加载。`mcp_server/server.py` 向 AI 提供结构化工具；`canvas_study/application.py` 组织查询、发现、下载、上传和提交工作流；`canvas_study/runtime.py` 负责 Canvas HTTP、凭证、缓存和底层操作。`scripts/canvas_cli.py` 只是同一套能力的本地入口，不是 MCP 的下游命令执行器。
 
-正常调用关系是：
-
-```text
-AI → MCP → Application → Canvas Runtime / Index → Canvas API
-                         ↑
-CLI ─────────────────────┘
-```
-
-MCP 与 CLI 都直接调用共享代码，MCP 不拼接或执行 CLI 命令。
 
 ## 环境要求
 
@@ -85,15 +76,7 @@ Linux 可选安装：
 python3 -m pip install -r requirements-optional.txt
 ```
 
-安装 Skill 后运行一次：
 
-```bash
-python3 scripts/setup_mcp.py
-```
-
-该命令会在用户应用数据目录中创建隔离的 Python 环境、安装官方 MCP SDK、验证 Server，并通过 `codex mcp add` 自动注册 `canvas-study-assistant`。它可以重复运行：注册信息未变化时不会重复添加，Skill 路径变化时会更新旧注册。完成后重启 Codex，使新 MCP Server 生效。
-
-安装过程不会读取 Canvas Token，也不会连接 Canvas。Canvas 账号仍在首次使用 Skill 时单独连接。若 Codex CLI 不在 PATH，可传入 `--codex-bin PATH`。
 
 ## 安装到 Codex
 
@@ -151,6 +134,22 @@ Canvas 地址是平时登录 Canvas 使用的域名，不包含课程路径或 `
 ### 3. 在对话中初始化
 
 ```text
+帮我初始化Canvas Study Assistant
+```
+
+或者安装 Skill 后运行一次：
+
+```bash
+python3 scripts/setup_mcp.py
+```
+
+该命令会在用户应用数据目录中创建隔离的 Python 环境、安装官方 MCP SDK、验证 Server，并通过 `codex mcp add` 自动注册 `canvas-study-assistant`。它可以重复运行：注册信息未变化时不会重复添加，Skill 路径变化时会更新旧注册。完成后重启 Codex，使新 MCP Server 生效。
+
+安装过程不会读取 Canvas Token，也不会连接 Canvas。Canvas 账号仍在首次使用 Skill 时单独连接。若 Codex CLI 不在 PATH，可传入 `--codex-bin PATH`。
+
+这里用户只需要执行一次重启，因为当前对话启动后，工具列表不能动态增加。
+
+```text
 使用 $canvas-study-assistant 连接我的 Canvas
 ```
 
@@ -162,7 +161,7 @@ Access Token：
 Token 到期日期（可选）：
 ```
 
-直接发送 Token 操作最简单，但 Token 会出现在当前对话历史中。不要分享该对话；如果对话曾被公开，应立即在 Canvas 中撤销 Token 并生成新的 Token。Skill 收到后不会复述或显示 Token。
+直接发送 Token 操作最简单，但 Token 会出现在当前对话历史中。Skill 收到后不会复述或显示 Token。
 
 如果不希望 Token 出现在对话中，可要求使用隐藏的本地输入方式。
 
@@ -281,7 +280,7 @@ Demo 默认仅保存在本地，并与上传、提交操作分开。
 
 ## MCP 与 CLI
 
-支持 MCP 的 Agent 应优先使用 MCP 工具完成课程、作业、索引、下载、上传和提交工作流。上传与提交分别提供“预览”和“执行”工具；执行工具只能在用户看过对应预览并明确确认后调用。
+支持 MCP 的 Agent 会优先使用 MCP 工具完成课程、作业、索引、下载、上传和提交工作流。上传与提交分别提供“预览”和“执行”工具；执行工具只能在用户看过对应预览并明确确认后调用。
 
 CLI 用于首次 Token 初始化、没有 MCP 的环境、开发调试和故障恢复：
 
