@@ -1,6 +1,6 @@
 # Canvas Study Assistant
 
-一个面向学生的 Codex Skill。MCP 是 AI 的主要结构化工具入口；本地 CLI 用于首次连接、故障恢复和开发调试。两者共享同一套 Canvas 应用服务，在对话中查询课程、整理作业与截止日期、安排学习计划、下载课程资料，并在用户明确确认后辅助上传和提交作业。
+一个面向学生的 Codex Skill。支持用户在对话中查询课程、整理作业与截止日期、安排学习计划、下载课程资料，并在用户明确确认后辅助上传和提交作业。
 
 本项目只支持学生工作流，不提供教师、批改、课程管理或查看其他学生数据的能力。
 
@@ -61,7 +61,6 @@ canvas-study-assistant-skill/
 
 ```
 
-`SKILL.md` 是 Skill 的入口，详细流程按需从 `references/` 加载。`mcp_server/server.py` 向 AI 提供结构化工具；`canvas_study/application.py` 组织查询、发现、下载、上传和提交工作流；`canvas_study/runtime.py` 负责 Canvas HTTP、凭证、缓存和底层操作。`scripts/canvas_cli.py` 只是同一套能力的本地入口，不是 MCP 的下游命令执行器。
 
 
 ## 环境要求
@@ -133,6 +132,7 @@ Canvas 地址是平时登录 Canvas 使用的域名，不包含课程路径或 `
 ```
 
 ### 3. 在对话中初始化
+#### 初始化MCP
 
 ```text
 帮我初始化Canvas Study Assistant
@@ -149,6 +149,8 @@ python3 scripts/setup_mcp.py
 安装过程不会读取 Canvas Token，也不会连接 Canvas。Canvas 账号仍在首次使用 Skill 时单独连接。若 Codex CLI 不在 PATH，可传入 `--codex-bin PATH`。
 
 这里用户只需要执行一次重启，因为当前对话启动后，工具列表不能动态增加。
+
+#### 连接Canvas
 
 ```text
 使用 $canvas-study-assistant 连接我的 Canvas
