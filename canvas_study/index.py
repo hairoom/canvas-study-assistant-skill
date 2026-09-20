@@ -4,6 +4,7 @@ import json
 import re
 import sqlite3
 import time
+from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any
 
@@ -45,6 +46,15 @@ class ResourceIndex:
           count INTEGER, detail TEXT, checked_at REAL NOT NULL,
           PRIMARY KEY(course_id, resource_kind)
         );
+        CREATE TABLE IF NOT EXISTS discovery_sources (
+          source_key TEXT PRIMARY KEY, canvas_host TEXT NOT NULL, course_id TEXT NOT NULL,
+          kind TEXT NOT NULL, path TEXT NOT NULL, params_json TEXT NOT NULL,
+          paginate INTEGER NOT NULL, items_field TEXT, id_field TEXT NOT NULL,
+          title_field TEXT NOT NULL, evidence TEXT NOT NULL, status TEXT NOT NULL,
+          last_verified_at REAL NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_discovery_sources_scope
+          ON discovery_sources(canvas_host, course_id, status);
         """)
         self.db.commit()
 
@@ -80,6 +90,33 @@ class ResourceIndex:
         self.db.execute("""INSERT OR REPLACE INTO sync_state(course_id,resource_kind,status,count,detail,checked_at)
           VALUES(?,?,?,?,?,?)""", (str(course_id), kind, status, count, detail, time.time()))
 
+    def upsert_discovery_source(self, source: dict[str, Any]):
+        self.db.execute("""INSERT INTO discovery_sources(
+          source_key,canvas_host,course_id,kind,path,params_json,paginate,items_field,
+          id_field,title_field,evidence,status,last_verified_at
+        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(source_key) DO UPDATE SET
+          kind=excluded.kind,path=excluded.path,params_json=excluded.params_json,
+          paginate=excluded.paginate,items_field=excluded.items_field,
+          id_field=excluded.id_field,title_field=excluded.title_field,
+          evidence=excluded.evidence,status=excluded.status,last_verified_at=excluded.last_verified_at""", (
+            source["source_key"], source["canvas_host"], str(source["course_id"]), source["kind"],
+            source["path"], json.dumps(source.get("params") or {}, ensure_ascii=False),
+            int(bool(source.get("paginate"))), source.get("items_field"), source["id_field"],
+            source["title_field"], source["evidence"], source.get("status", "verified"), time.time(),
+        ))
+
+    def discovery_sources(self, canvas_host: str, course_id: str) -> list[dict[str, Any]]:
+        rows = self.db.execute("""SELECT * FROM discovery_sources
+          WHERE canvas_host=? AND course_id=? AND status='verified'
+          ORDER BY last_verified_at DESC""", (canvas_host, str(course_id))).fetchall()
+        result = []
+        for row in rows:
+            item = dict(row)
+            item["params"] = json.loads(item.pop("params_json"))
+            item["paginate"] = bool(item["paginate"])
+            result.append(item)
+        return result
+
     def commit(self): self.db.commit()
 
     def search(self, course_id, query, kinds=None, limit=10):
@@ -94,6 +131,10 @@ class ResourceIndex:
             score, reasons = 0, []
             if query_norm and title == query_norm: score += 100; reasons.append("exact title")
             elif query_norm and query_norm in title: score += 70; reasons.append("title phrase")
+            elif min(len(query_norm), len(title)) >= 4:
+                similarity = SequenceMatcher(None, query_norm, title).ratio()
+                if similarity >= 0.72:
+                    score += round(60 * similarity); reasons.append("fuzzy title")
             overlap = len(tokens & title_tokens)
             if overlap: score += round(45 * overlap / max(1, len(tokens))); reasons.append(f"{overlap} query terms")
             context = self._context(row["resource_key"])
@@ -126,5 +167,8 @@ class ResourceIndex:
     def status(self):
         courses = self.db.execute("SELECT COUNT(*) FROM courses").fetchone()[0]
         resources = self.db.execute("SELECT COUNT(*) FROM resources").fetchone()[0]
+        discovery_sources = self.db.execute(
+            "SELECT COUNT(*) FROM discovery_sources WHERE status='verified'"
+        ).fetchone()[0]
         states = [dict(row) for row in self.db.execute("SELECT * FROM sync_state ORDER BY course_id,resource_kind")]
-        return {"courses": courses, "resources": resources, "states": states}
+        return {"courses": courses, "resources": resources, "discovery_sources": discovery_sources, "states": states}

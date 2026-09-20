@@ -12,11 +12,22 @@ class CanvasStudyService:
     def find_resource(self, course_id, query, kinds=None, limit=10):
         inferred = REGISTRY.kinds_for_query(query)
         selected = kinds or inferred or None
-        source_specs = [REGISTRY.get(k) for k in selected] if selected else REGISTRY.all()
+        source_specs = []
+        for kind in selected or []:
+            try: source_specs.append(REGISTRY.get(kind))
+            except KeyError: pass
+        if not selected:
+            source_specs = list(REGISTRY.all())
         index = ResourceIndex(self.index_path)
         try:
+            results = index.search(course_id, query, selected, limit)
+            if not kinds and inferred and (not results or results[0]["confidence"] < 50):
+                broad_results = index.search(course_id, query, None, limit)
+                if broad_results and (not results or broad_results[0]["confidence"] > results[0]["confidence"]):
+                    results = broad_results
+                source_specs = list(REGISTRY.all())
             return {"query": query, "inferred_kinds": inferred, "candidate_sources": sorted({s for spec in source_specs for s in spec.candidate_sources}),
-                    "results": index.search(course_id, query, selected, limit)}
+                    "results": results}
         finally: index.close()
 
     def course_tree(self, course_id):

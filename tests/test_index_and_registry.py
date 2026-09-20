@@ -71,5 +71,19 @@ class RegistryAndIndexTests(unittest.TestCase):
         self.assertIn("file", result["inferred_kinds"])
         self.assertIn("course_files", result["candidate_sources"])
 
+    def test_discovery_source_is_scoped_and_persistent(self):
+        index = ResourceIndex(self.path)
+        index.upsert_discovery_source({
+            "source_key": "discovery:test", "canvas_host": "canvas.example.edu",
+            "course_id": "7", "kind": "interactive_video",
+            "path": "/api/v1/courses/7/interactive_videos", "params": {},
+            "paginate": True, "items_field": None, "id_field": "id",
+            "title_field": "title", "evidence": "official docs", "status": "verified",
+        })
+        index.commit()
+        self.assertEqual(index.discovery_sources("canvas.example.edu", "7")[0]["source_key"], "discovery:test")
+        self.assertEqual(index.discovery_sources("other.example.edu", "7"), [])
+        index.close()
+
 
 if __name__ == "__main__": unittest.main()

@@ -23,6 +23,7 @@ downloads/
 canvas-downloads/
 submissions/
 *.ics
+*.sqlite3*
 
 # Reports and logs
 *.log

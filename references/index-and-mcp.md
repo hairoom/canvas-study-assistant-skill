@@ -13,13 +13,13 @@
 
 ## Search workflow
 
-Use `canvas_find_resource` first, or `find-resource` only as a fallback. The registry infers likely resource kinds and reports candidate locations such as Module Items, course Files, syllabus links, Pages, and Assignment attachments. Results include confidence, reasons, and related Module/context nodes. Explicit Canvas relationships outrank fuzzy title inference.
+Use `canvas_find_resource` first, or `find-resource` only as a fallback. It corrects close spelling errors, searches the index, automatically performs a live single-course structural refresh when no result reaches the reliability threshold, refreshes verified learned sources, and searches again. The registry reports candidate locations such as Module Items, course Files, syllabus links, Pages, and Assignment attachments. Results include confidence, reasons, and related Module/context nodes. Explicit Canvas relationships outrank fuzzy title inference.
 
-If no reliable indexed result exists, refresh the course structure and retry. Detail bodies and files remain on-demand; do not turn a metadata search into a full-content crawl.
+If no reliable result exists after automatic refresh, the response enters `dynamic_discovery` and supplies compact unknown/external Module clues plus the official documentation root. The Agent may research a candidate endpoint without asking the user to assert that the resource exists. Only `canvas_discover_api_resources` may persist a learned source: it must be a verified, same-origin, course-scoped GET response containing a query-relevant resource. Detail bodies and files remain on-demand; do not turn discovery into a full-content crawl.
 
 ## Index safety
 
-The SQLite index may store resource IDs, titles, types, timestamps, lock states, small metadata fields, and graph relationships. Never store access tokens, authorization headers, signed URLs, file bytes, full Page/Assignment/Discussion bodies, or submission content in the structural index.
+The SQLite index may store resource IDs, titles, types, timestamps, lock states, small metadata fields, graph relationships, and verified local discovery rules. Learned rules are scoped by Canvas host and course and include only endpoint paths, non-secret parameters, field mappings, evidence, and verification time. Never store access tokens, authorization headers, signed URLs, file bytes, full Page/Assignment/Discussion bodies, or submission content in the structural index.
 
 ## MCP
 
@@ -32,6 +32,8 @@ Available tools:
 - `canvas_list_assignments`: course assignments, deadlines, and submission state.
 - `canvas_get_schedule`: pending assignments in a bounded date window.
 - `canvas_find_resource`: cross-source exact/fuzzy resource lookup.
+- `canvas_read_api`: bounded same-origin GET probe for dynamic discovery.
+- `canvas_discover_api_resources`: verify a course-scoped GET endpoint, index matching resources, and save its local rule.
 - `canvas_get_course_tree`: indexed Module/resource structure.
 - `canvas_get_modules`, `canvas_get_files`, `canvas_inspect_course`: live course discovery.
 - `canvas_get_sync_status`: coverage and capability states.

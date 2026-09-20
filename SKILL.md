@@ -36,7 +36,8 @@ Apart from the user's deliberate first-round plaintext message, never write or r
 - Resolve courses by exact ID first, then course name/code. Ask the user when multiple plausible matches remain.
 - Inspect the course before claiming content is absent. Distinguish empty, hidden, locked, permission-denied, unsupported, and external-tool content.
 - Treat Modules as an ordered relationship graph, not a file list. Preserve module context and report unknown item types instead of silently dropping them.
-- Search the local course index first with `canvas_find_resource`. Use registry candidate sources to refresh only relevant Canvas locations when indexed results are stale or inconclusive.
+- Search with `canvas_find_resource`. It handles spelling-tolerant index lookup, refreshes the selected course automatically when no reliable result exists, retries verified local discovery rules, and returns `search_mode=dynamic_discovery` only after those stages fail. Do not ask the user to assert that a resource exists before entering discovery.
+- When `search_mode=dynamic_discovery`, read [references/resource-discovery.md](references/resource-discovery.md), use the returned clues to search only official Instructure documentation, and validate candidate endpoints with `canvas_read_api` or `canvas_discover_api_resources`. Discovery is read-only, bounded, same-origin, and course-scoped. Never send the Canvas token to a documentation site.
 - Convert all dates to the timezone returned by the Canvas profile. Use the effective per-student due date when available. Keep assignments without a deadline in a separate group.
 - Refresh assignment data before producing a study plan. Ask for missing availability and effort estimates only when they materially change the plan; clearly label estimates.
 - Display schedules in chat. Mention that Markdown, CSV, Excel, calendar-event lists, or checklists can be generated on request.

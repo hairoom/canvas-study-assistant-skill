@@ -538,6 +538,20 @@ def cmd_api_get(args):
     output(scrub_api_output(data))
 
 
+def cmd_discover_api_resources(args):
+    params = {}
+    for pair in args.param:
+        if "=" not in pair: raise RuntimeError("--param must use KEY=VALUE")
+        key, value = pair.split("=", 1)
+        if key in params: raise RuntimeError("Duplicate parameters are not supported for learned sources")
+        params[key] = value
+    output(application().discover_api_resources(
+        args.course, args.query, args.kind, args.path,
+        args.id_field, args.title_field, args.items_field,
+        params, args.paginate, args.evidence,
+    ))
+
+
 def cmd_match(args):
     output(application().match_assignment_files(args.course, args.assignment))
 
@@ -607,6 +621,7 @@ def make_parser():
     p=sub.add_parser("inspect-course"); p.add_argument("--course", required=True); p.add_argument("--refresh", action="store_true"); p.add_argument("--full", action="store_true"); p.set_defaults(fn=cmd_inspect)
     p=sub.add_parser("doctor"); p.add_argument("--course", required=True); p.set_defaults(fn=cmd_doctor)
     p=sub.add_parser("api-get"); p.add_argument("--path", required=True); p.add_argument("--param", action="append", default=[]); p.add_argument("--paginate", action="store_true"); p.add_argument("--limit", type=int, default=500); p.set_defaults(fn=cmd_api_get)
+    p=sub.add_parser("discover-api-resources"); p.add_argument("--course", required=True); p.add_argument("--query", required=True); p.add_argument("--kind", required=True); p.add_argument("--path", required=True); p.add_argument("--id-field", default="id"); p.add_argument("--title-field", default="title"); p.add_argument("--items-field"); p.add_argument("--param", action="append", default=[]); p.add_argument("--paginate", action="store_true"); p.add_argument("--evidence", default="https://developerdocs.instructure.com/services/canvas"); p.set_defaults(fn=cmd_discover_api_resources)
     p=sub.add_parser("match-files"); p.add_argument("--course", required=True); p.add_argument("--assignment", required=True); p.set_defaults(fn=cmd_match)
     p=sub.add_parser("download"); p.add_argument("--file-id", required=True); p.add_argument("--output", required=True); p.set_defaults(fn=cmd_download)
     p=sub.add_parser("upload-draft"); p.add_argument("--course", required=True); p.add_argument("--assignment", required=True); p.add_argument("--file", required=True); p.add_argument("--confirm"); p.set_defaults(fn=cmd_upload)
